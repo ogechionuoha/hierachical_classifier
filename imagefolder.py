@@ -129,6 +129,7 @@ class HierarchicalSoftmax(torch.nn.Module):
 
             # setup linear layer for current nodes which are children of level_id-1
             else:
+                print(self.labelmap.level_names[level_id-1])
                 child_of_l_1 = getattr(self.labelmap, 'child_of_{}_ix'.format(self.labelmap.level_names[level_id-1]))
                 for parent_id in child_of_l_1:
                     self.module_dict['{}_{}'.format(level_name, parent_id)] = nn.Linear(input_size, len(child_of_l_1[parent_id]))
@@ -182,7 +183,7 @@ class HierarchicalSoftmaxLoss(torch.nn.Module):
 
 if __name__ == '__main__':
     root_folder = './data/fmnist'
-    imgfoldermap = HeirarchicalLabelMap(root_folder)
+    imgfoldermap = HeirarchicalLabelMap(root_folder, level_names=['family', 'classes'])
     hsoftmax = HierarchicalSoftmax(labelmap=imgfoldermap, input_size=4, level_weights=None)
     penult_layer = torch.tensor([[1, 2, 1, 2.0], [1, 10, -7, 10], [1, 9, 1, -2]])
     print(hsoftmax(penult_layer))
