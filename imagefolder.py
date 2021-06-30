@@ -7,20 +7,20 @@ from torch import nn
 class HeirarchicalLabelMap:
     def __init__(self, root_folder, level_names=None):
         self.pathmap = self.get_pathmap(root_folder)
-        self.classes_to_ix =  self.get_classes_to_ix(root_folder)
+        self.classes_to_ix =  self.get_classes_to_ix()
         self.ix_to_classes = {self.classes_to_ix[k]: k for k in self.classes_to_ix}
         self.classes = [k for k in self.classes_to_ix]
         self.levels = self.get_levels(root_folder)
         self.n_classes = sum(self.levels)
         self.child_of_family_ix = self.build_label_tree(root_folder)
-        self.family = self.get_family(root_folder)
+        self.family = self.get_family()
         
         self.level_names = level_names
         if self.level_names is None:
             self.level_names= [str(i) for i in range(len(self.levels))]
 
     def get_pathmap(self, path, pathmap = {}, index=0):
-        subs = os.walk(path).next()[1]
+        subs = next(os.walk(path))[1]
 
         if len(subs) > 0:
             pathmap[index] = pathmap.get(index, []) + subs
@@ -31,17 +31,17 @@ class HeirarchicalLabelMap:
         return pathmap
 
     def get_levels(self, path, pathmap = {}, index=0):
-        subs = os.walk(path).next()[1]
+        subs = next(os.walk(path))[1]
         if len(subs) > 0:
             pathmap[index] = pathmap.get(index, 0) + len(subs)
             for sub in subs:
                 self.get_levels(os.path.join(path,sub), pathmap, index+1)
-        return [v for k,v in pathmap.items()]
+        return [v for _,v in pathmap.items()]
 
-    def get_family(self, path, pathmap={}, start_index=0):
+    def get_family(self):
         pm = self.pathmap
         family = []
-        for k, arr in pm.items():
+        for _, arr in pm.items():
             count = 0
             res = {}
             for v in arr:
@@ -50,21 +50,21 @@ class HeirarchicalLabelMap:
             family.append(res)
         return family
 
-    def get_classes_to_ix(self, path, pathmap={}, start_index=0):
+    def get_classes_to_ix(self):
         pm = self.pathmap
         count = 0
         res = {}
-        for k, arr in pm.items():
+        for _, arr in pm.items():
             for v in arr:
                 res[v] = count
                 count += 1
         return res
         
     def build_label_tree(self, path, d = {}):
-        if os.walk(path).next()[1] == []:
+        if next(os.walk(path))[1] == []:
             return os.path.basename(path)
         else:
-            return {os.path.basename(path) : [self.build_label_tree(os.path.join(path, x)) for x in os.walk(path).next()[1]]}
+            return {os.path.basename(path) : [self.build_label_tree(os.path.join(path, x)) for x in next(os.walk(path))[1]]}
 
     def labels_one_hot(self, class_name):
         indices = self.get_level_labels(class_name)
