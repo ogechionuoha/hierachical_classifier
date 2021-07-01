@@ -8,9 +8,9 @@ class HeirarchicalLabelMap:
     def __init__(self, root_folder, level_names=None):
         self.data_folder = root_folder
         self.pathmap = self.get_pathmap(root_folder)
-        self.classes_to_ix =  self.get_classes_to_ix()
-        self.ix_to_classes = {self.classes_to_ix[k]: k for k in self.classes_to_ix}
-        self.classes = [k for k in self.classes_to_ix]
+        #self.classes_to_ix =  self.get_classes_to_ix()
+        #self.ix_to_classes = {self.classes_to_ix[k]: k for k in self.classes_to_ix}
+        #self.classes = [k for k in self.classes_to_ix]
         self.levels = self.get_levels(root_folder)
         self.n_classes = sum(self.levels)
         self.child_of_family_ix = self.build_label_tree(root_folder)
@@ -18,8 +18,13 @@ class HeirarchicalLabelMap:
         self.keytrees = self.get_keytrees(root_folder)
         self.level_names = level_names
         self.child_map = self.get_all_children(root_folder)
+        self.leaf_class_labels = self.family[len(self.levels)-1]
         if self.level_names is None:
             self.level_names= [str(i) for i in range(len(self.levels))]
+
+    def get_leaf_indices(self, labels=[]):
+        indices = [self.leaf_class_labels[i] for i in labels]
+        return torch.tensor(indices)
 
     def get_keytrees(self, path, pathmap = {}, index=0):
         subs = next(os.walk(path))[1]
