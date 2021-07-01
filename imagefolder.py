@@ -17,6 +17,7 @@ class HeirarchicalLabelMap:
         self.family = self.get_family()
         self.keytrees = self.get_keytrees(root_folder)
         self.level_names = level_names
+        self.child_map = self.get_all_children(root_folder)
         if self.level_names is None:
             self.level_names= [str(i) for i in range(len(self.levels))]
 
@@ -114,6 +115,28 @@ class HeirarchicalLabelMap:
 
         return path
 
+    def get_index(self, class_name):
+        family = self.family
+        level = 0
+        for fam in family:
+            level+=1
+            if class_name in fam.keys():
+                break
+            
+        ind = family[level-1][class_name]
+
+        return level-1, ind
+
+    
+    def get_all_children(self, path, pathmap={}):
+        subs = next(os.walk(path))[1]
+        if len(subs) > 0:
+            pathmap[os.path.basename(path)] = subs
+            for sub in subs:
+                self.get_all_children(os.path.join(path,sub), pathmap)
+        return pathmap
+
+
 
 class HierarchicalSoftmax(torch.nn.Module):
     def __init__(self, labelmap, input_size, level_weights=None):
@@ -140,7 +163,7 @@ class HierarchicalSoftmax(torch.nn.Module):
                 child_of_l_1 = self.labelmap.pathmap[level_id-1]
                 for parent in child_of_l_1:
                     nchildren = self.labelmap.keytrees[parent]
-                    self.module_dict['{}_{}'.format(parent, level_id)] = nn.Linear(input_size, nchildren)
+                    self.module_dict['{}_{}_{}'.format(self.labelmap.level_names[level_id-1],parent, level_id)] = nn.Linear(input_size, nchildren)
 
         self.module_dict = nn.ModuleDict(self.module_dict)
         print(self.module_dict)
@@ -152,10 +175,10 @@ class HierarchicalSoftmax(torch.nn.Module):
         :param x: <torch.tensor> output of the penultimate layer
         :return: all_log_probs <torch.tensor>, last level log_probs <torch.tensor>
         """
-        print(self.level_start,self.level_stop)
+        
         all_log_probs = torch.zeros((x.shape[0], self.labelmap.n_classes)).to(self.device)
 
-        for level_id in range(len(self.labelmap.levels)-1):
+        for level_id in range(len(self.labelmap.levels)):
             # print(all_log_probs)
             if level_id == 0:
                 # print(level_name)
@@ -165,16 +188,17 @@ class HierarchicalSoftmax(torch.nn.Module):
             # setup linear layer for current nodes which are children of level_id-1
             else:
                 child_of_l_1 = self.labelmap.pathmap[level_id-1]
-                print(self.level_start[level_id], 'Child of LLLL', child_of_l_1)
                 for parent in child_of_l_1:
-                    # print('child_of_{}_ix'.format(self.labelmap.level_names[level_id - 1]),
-                    #       '{}_{}'.format(level_name, parent_id))
-                    # print("saving log probs for: {1} -> {0}".format(self.level_start[level_id] + torch.tensor(child_of_l_1[parent_id]), torch.tensor(child_of_l_1[parent_id])))
-                    log_probs = torch.nn.functional.log_softmax(self.module_dict['{}_{}'.format(parent, level_id)](x), dim=1)
-                    # print("{0} + {1} = {2}".format(log_probs, all_log_probs[:, self.level_start[level_id-1] + parent_id].unsqueeze(1), log_probs + all_log_probs[:, self.level_start[level_id-1] + parent_id].unsqueeze(1)))
-                    print('This',parent, torch.tensor(self.labelmap.keytrees[parent]))
-                    
-                    all_log_probs[:, self.level_start[level_id] + torch.tensor(self.labelmap.keytrees[parent]).to(self.device)] = log_probs.to(self.device) + all_log_probs[:, self.level_start[level_id-1] + level_id].unsqueeze(1)
+                    log_probs = torch.nn.functional.log_softmax(self.module_dict['{}_{}_{}'.format(self.labelmap.level_names[level_id-1], parent, level_id)](x), dim=1)
+                    child_indices = [self.labelmap.get_index(child)[1] for child  in self.labelmap.child_map[parent]]
+                    #print('{}_{}'.format(parent, level_id))
+                    #print('child indices', child_indices)
+                    _, par_ind = self.labelmap.get_index(parent)
+                    #print(self.level_start[level_id] , torch.tensor([child_indices]).to(self.device), self.level_start[level_id] + torch.tensor([child_indices]).to(self.device))
+                    #print('')
+                    #print(par_ind)
+                    #print(log_probs, all_log_probs[:, self.level_start[level_id-1] + par_ind])
+                    all_log_probs[:, self.level_start[level_id] + torch.tensor(child_indices).to(self.device)] = log_probs.to(self.device) + all_log_probs[:, self.level_start[level_id-1] + par_ind] .unsqueeze(1)
 
         # return only leaf probs
         # print(all_log_probs)
@@ -193,15 +217,7 @@ class HierarchicalSoftmaxLoss(torch.nn.Module):
 
 if __name__ == '__main__':
     root_folder = './data/train'
-    imgfoldermap = HeirarchicalLabelMap(root_folder, level_names=['family', 'classes'])
-    print(imgfoldermap.levels)
-    '''
-    print(imgfoldermap.family)
-    print(imgfoldermap.child_of_family_ix)
-    print(imgfoldermap.pathmap)
-    print('')
-    print(imgfoldermap.keytrees)
-    '''
+    imgfoldermap = HeirarchicalLabelMap(root_folder, level_names=['continent', 'region', 'country'])    
     hsoftmax = HierarchicalSoftmax(labelmap=imgfoldermap, input_size=4, level_weights=None)
     penult_layer = torch.tensor([[1, 2, 1, 2.0], [1, 10, -7, 10], [1, 9, 1, -2]])
     print(hsoftmax(penult_layer))
