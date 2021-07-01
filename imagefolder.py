@@ -8,7 +8,6 @@ class HeirarchicalLabelMap:
     def __init__(self, root_folder, level_names=None):
         self.data_folder = root_folder
         self.pathmap = self.get_pathmap(root_folder)
-        #self.classes_to_ix =  self.get_classes_to_ix()
         #self.ix_to_classes = {self.classes_to_ix[k]: k for k in self.classes_to_ix}
         #self.classes = [k for k in self.classes_to_ix]
         self.levels = self.get_levels(root_folder)
@@ -64,16 +63,6 @@ class HeirarchicalLabelMap:
                 count += 1
             family.append(res)
         return family
-
-    def get_classes_to_ix(self):
-        pm = self.pathmap
-        count = 0
-        res = {}
-        for _, arr in pm.items():
-            for v in arr:
-                res[v] = count
-                count += 1
-        return res
         
     def build_label_tree(self, path, d = {}):
         if next(os.walk(path))[1] == []:
@@ -140,6 +129,7 @@ class HeirarchicalLabelMap:
             for sub in subs:
                 self.get_all_children(os.path.join(path,sub), pathmap)
         return pathmap
+
 
 
 
@@ -226,14 +216,13 @@ if __name__ == '__main__':
     hsoftmax = HierarchicalSoftmax(labelmap=imgfoldermap, input_size=4, level_weights=None)
     penult_layer = torch.tensor([[1, 2, 1, 2.0], [1, 10, -7, 10], [1, 9, 1, -2]])
     criterion = torch.nn.NLLLoss()
-    class_labels = imgfoldermap.family[len(imgfoldermap.levels)-1]
-    labels = torch.tensor([class_labels['ghana'], class_labels['uk'], class_labels['belgium']]).to(hsoftmax.device)
+    labels = imgfoldermap.get_leaf_indices(['ghana','uk', 'belgium']).to(hsoftmax.device)
     optimizer = torch.optim.Adam(hsoftmax.parameters())
     class_labels = imgfoldermap.family[len(imgfoldermap.levels)-1]
 
     print(hsoftmax(penult_layer))
 
-    for i in range(500):
+    for i in range(5):
         res = hsoftmax(penult_layer)
         #res = torch.exp(res[0]), torch.exp(res[1])
         loss = criterion(res[1], labels)
