@@ -8,12 +8,11 @@ class HeirarchicalLabelMap:
     def __init__(self, root_folder, level_names=None):
         self.data_folder = root_folder
         self.pathmap = self.get_pathmap(root_folder)
-        #self.ix_to_classes = {self.classes_to_ix[k]: k for k in self.classes_to_ix}
-        #self.classes = [k for k in self.classes_to_ix]
         self.levels = self.get_levels(root_folder)
         self.n_classes = sum(self.levels)
         self.child_of_family_ix = self.build_label_tree(root_folder)
         self.family = self.get_family()
+        self.ix_to_family = [{v:k for k,v in group.items()} for group in self.family]
         self.keytrees = self.get_keytrees(root_folder)
         self.level_names = level_names
         self.child_map = self.get_all_children(root_folder)
@@ -24,6 +23,22 @@ class HeirarchicalLabelMap:
     def get_leaf_indices(self, labels=[]):
         indices = [self.leaf_class_labels[i] for i in labels]
         return torch.tensor(indices)
+
+    def get_heirarchies(self, logits):
+        assert logits.shape[1] == self.n_classes, 'Labels do not match the total number of classes including hierarchies'
+        res_ind = np.zeros((logits.shape[0], len(self.levels))) 
+        start = 0
+        for i, level in enumerate(self.levels):
+            if i == 0:
+                l = logits[:,start: level]
+            else: l = logits[:,start: level+start]
+            arg_max = torch.argmax(l, dim=1)
+            res_ind[:, i] = arg_max.cpu().numpy()
+            start += level
+        return res_ind
+
+    def get_heirarchy_label(self, indices):
+        return [self.ix_to_family[i][int(ind)] for i, ind in enumerate(indices)]
 
     def get_keytrees(self, path, pathmap = {}, index=0):
         subs = next(os.walk(path))[1]
@@ -218,11 +233,8 @@ if __name__ == '__main__':
     criterion = torch.nn.NLLLoss()
     labels = imgfoldermap.get_leaf_indices(['ghana','uk', 'belgium']).to(hsoftmax.device)
     optimizer = torch.optim.Adam(hsoftmax.parameters())
-    class_labels = imgfoldermap.family[len(imgfoldermap.levels)-1]
 
-    print(hsoftmax(penult_layer))
-
-    for i in range(5):
+    for i in range(500):
         res = hsoftmax(penult_layer)
         #res = torch.exp(res[0]), torch.exp(res[1])
         loss = criterion(res[1], labels)
@@ -231,6 +243,10 @@ if __name__ == '__main__':
         optimizer.step()
         print(f'epoch {i}: loss: {loss.item()}')
 
-    print(imgfoldermap.family)
-    print(torch.exp(res[0]))
-
+    print(imgfoldermap.ix_to_family)
+    logits = torch.exp(res[0])
+    print(logits)
+    h = imgfoldermap.get_heirarchies(logits)
+    print(h)
+    for l in h:
+        print(imgfoldermap.get_heirarchy_label(l))
