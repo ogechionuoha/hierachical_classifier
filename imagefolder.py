@@ -222,16 +222,21 @@ if __name__ == '__main__':
     penult_layer = torch.tensor([[1, 2, 1, 2.0], [1, 10, -7, 10], [1, 9, 1, -2]])
     criterion = torch.nn.NLLLoss()
     class_labels = imgfoldermap.family[len(imgfoldermap.levels)-1]
-    labels = torch.tensor([imgfoldermap.labels_one_hot('ghana'), imgfoldermap.labels_one_hot('uk'), imgfoldermap.labels_one_hot('belgium')]).to(hsoftmax.device)
     labels = torch.tensor([class_labels['ghana'], class_labels['uk'], class_labels['belgium']]).to(hsoftmax.device)
-    
     optimizer = torch.optim.Adam(hsoftmax.parameters())
     class_labels = imgfoldermap.family[len(imgfoldermap.levels)-1]
-    for i in range(10):
+
+    print(hsoftmax(penult_layer))
+
+    for i in range(500):
         res = hsoftmax(penult_layer)
-        loss = criterion(res[0], labels)
+        #res = torch.exp(res[0]), torch.exp(res[1])
+        loss = criterion(res[1], labels)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         print(f'epoch {i}: loss: {loss.item()}')
+
+    print(imgfoldermap.family)
+    print(torch.exp(res[0]))
 
