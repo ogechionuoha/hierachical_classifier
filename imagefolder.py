@@ -215,16 +215,6 @@ class HierarchicalSoftmax(torch.nn.Module):
         return all_log_probs, all_log_probs[:, self.level_start[-1]:self.level_stop[-1]]
 
 
-class HierarchicalSoftmaxLoss(torch.nn.Module):
-    def __init__(self, labelmap, level_weights=None):
-        torch.nn.Module.__init__(self)
-        self.labelmap = labelmap
-        self.criterion = torch.nn.NLLLoss()
-
-    def forward(self, outputs, labels, level_labels):
-        return self.criterion(outputs, level_labels[:, -1])
-
-
 if __name__ == '__main__':
     root_folder = './data/train'
     imgfoldermap = HeirarchicalLabelMap(root_folder, level_names=['continent', 'region', 'country'])    
