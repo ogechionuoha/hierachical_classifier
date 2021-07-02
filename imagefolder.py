@@ -6,6 +6,7 @@ from torch import nn
 
 class HeirarchicalLabelMap:
     def __init__(self, root_folder, level_names=None):
+        root_folder = os.path.expanduser(root_folder)
         self.data_folder = root_folder
         self.pathmap = self.get_pathmap(root_folder)
         self.levels = self.get_levels(root_folder)
@@ -144,7 +145,9 @@ class HeirarchicalLabelMap:
             for sub in subs:
                 self.get_all_children(os.path.join(path,sub), pathmap)
         return pathmap
-
+    
+    def get_leaf_paths(self):
+        return [x[0] for x in os.walk(self.data_folder) if os.path.basename(x[0]) in self.leaf_class_labels]
 
 
 
@@ -176,7 +179,7 @@ class HierarchicalSoftmax(torch.nn.Module):
                     self.module_dict['{}_{}_{}'.format(self.labelmap.level_names[level_id-1],parent, level_id)] = nn.Linear(input_size, nchildren)
 
         self.module_dict = nn.ModuleDict(self.module_dict)
-        print(self.module_dict)
+        #print(self.module_dict)
 
     def forward(self, x):
         """
@@ -216,14 +219,14 @@ class HierarchicalSoftmax(torch.nn.Module):
 
 
 if __name__ == '__main__':
-    root_folder = './data/train'
-    imgfoldermap = HeirarchicalLabelMap(root_folder, level_names=['continent', 'region', 'country'])    
+    root_folder = './data/val'
+    imgfoldermap = HeirarchicalLabelMap(root_folder, level_names=['category', 'subcategory', 'item'])    
     hsoftmax = HierarchicalSoftmax(labelmap=imgfoldermap, input_size=4, level_weights=None)
     penult_layer = torch.tensor([[1, 2, 1, 2.0], [1, 10, -7, 10], [1, 9, 1, -2]])
     criterion = torch.nn.NLLLoss()
-    labels = imgfoldermap.get_leaf_indices(['ghana','uk', 'belgium']).to(hsoftmax.device)
+    labels = imgfoldermap.get_leaf_indices(['Beef-Tomato','Conference', 'Pink-Lady']).to(hsoftmax.device)
     optimizer = torch.optim.Adam(hsoftmax.parameters())
-
+    print('labels', labels)
     for i in range(500):
         res = hsoftmax(penult_layer)
         #res = torch.exp(res[0]), torch.exp(res[1])
